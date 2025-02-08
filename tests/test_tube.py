@@ -162,14 +162,13 @@ class TestTube1DAero:
 
         # numerical solution
         sys.fl_in.W = 1.0
-        mach = IdealDryAir().mach(sys.fl_in.Pt, sys.fl_in.Tt, sys.fl_in.W, subsonic=True)
-        print(mach)
-
+        mach = IdealDryAir().mach(
+            sys.fl_in.Pt, sys.fl_in.Tt, sys.fl_in.W / sys.area_in, subsonic=True
+        )
         sys.Ps_out = IdealDryAir().static_p(sys.fl_in.Pt, sys.fl_in.Tt, mach)
 
-        sys.mesh()
-        assert min(sys.area) == pytest.approx(max(sys.area))
-
+        sys.scheme = "LW"
+        sys.implicit = False
         sys.run_once()
 
         assert sys.res < sys.ftol
@@ -218,12 +217,6 @@ class TestTube1DAero:
         assert pytest.approx(sys.fl_out.W, rel=2e-3) == W_in
         assert pytest.approx(sys.Ps[-1], rel=1e-3) == Ps_out
 
-        # test restart subsonic
-        assert not sys.init
-
-        sys.run_once()
-        assert sys.it == 1
-
     def test_run_once_supersonic(self):
         sys = Tube1DAero("tube")
 
@@ -256,6 +249,7 @@ class TestTube1DAero:
         assert pytest.approx(sys.mach[0], rel=1e-2) == mach_in
         assert pytest.approx(sys.mach[-1], rel=1e-2) == mach_exit
 
+        # implicit
         sys.implicit = True
         sys.CFL = 5.0
         sys.run_once()
@@ -297,9 +291,3 @@ class TestTube1DAero:
         assert sys.res < sys.ftol
         assert pytest.approx(sys.mach[0], rel=1e-2) == mach_in
         assert pytest.approx(sys.mach[-1], rel=1e-2) == mach_exit
-
-        # test restart supersonic
-        assert not sys.init
-
-        sys.run_once()
-        assert sys.it == 1

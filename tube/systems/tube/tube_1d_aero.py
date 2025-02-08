@@ -152,7 +152,6 @@ class Tube1DAero(System):
             # schemes in conservative form
             _, u, p, _, c = self.rupEc_from_q(q, area)
             dt = CFL * dx / (abs(u) + c)
-
             if self.scheme == "LW":
                 f12 = self.flux_LW(q, dt, dx, area)
             elif self.scheme == "Roe":
@@ -180,7 +179,7 @@ class Tube1DAero(System):
         self.mach = self.u / c
         self.Ts = gas.t_from_h(E - 0.5 * self.u * self.u + self.Ps / self.density)
 
-        self.fl_out.W, self.fl_out.Pt, self.fl_out.Tt = self.wpt_from_q(q[-1], area[-1])
+        self.fl_out.W, self.fl_out.Pt, self.fl_out.Tt = self.wpt_from_q(q[-2], area[-2])
 
         self.res = res
         self.it = it
@@ -196,6 +195,7 @@ class Tube1DAero(System):
         dx12 = 1 / 2 * (dx[:-1] + dx[1:])
         q12 = 1 / 2 * (q[:-1] + q[1:]) + 1 / 2 * ((f[:-1] - f[1:]).T * dt12 / dx12).T
         area12 = 1 / 2 * (s[:-1] + s[1:])
+
         return self.flux_from_q(q12, area12)
 
     def flux_roe(self, q, s):
@@ -338,7 +338,9 @@ class Tube1DAero(System):
         r = gas.density(ps, ts)
         u = ru / r
         rE = r * (gas.h(ts) + 0.5 * u * u) - ps
-        return np.transpose(area * np.array([r, ru, rE]))
+
+        q = np.transpose(area * np.array([r, ru, rE]))
+        return q
 
     def q_from_fluid_port(self, fl, area, subsonic):
         return self.q_from_wpt(fl.W, fl.Pt, fl.Tt, area, subsonic)

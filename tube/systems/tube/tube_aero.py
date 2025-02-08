@@ -3,8 +3,8 @@
 
 import numpy as np
 from cosapp.systems import System
-from pyturbo.thermo import IdealDryAir
 from pyturbo.ports import FluidPort
+from pyturbo.thermo import IdealDryAir
 
 
 class TubeAero(System):
@@ -33,7 +33,7 @@ class TubeAero(System):
         self.add_output(FluidPort, "fl_out")
 
         # inwards
-        self.add_inward('gas', IdealDryAir())
+        self.add_inward("gas", IdealDryAir())
         self.add_inward("f", 0.1, unit="")
 
         # outwards

@@ -116,22 +116,22 @@ class TestBasic:
 
     def test_mesh(self):
         sys = Tube1DAero("tube")
-        sys.area_in = 0.1
-        sys.area_exit = 0.2
-        sys.area_throat = 1.0
+        sys.geom = np.array([[0.0, 0.1], [1.0, 0.2]])
         sys.mesh()
 
-        assert len(sys.area) == sys.n
-        assert len(sys.x) == sys.n + 2
-        assert pytest.approx(sys.area[0]) == sys.area_in
-        assert pytest.approx(sys.area[-1]) == sys.area_exit
+        assert pytest.approx(sys.area[0]) == 0.1
+        assert pytest.approx(sys.area[-1]) == 0.2
 
-        sys.area_in = 0.1
-        sys.area_exit = 0.1
-        sys.area_throat = 0.9
+        sys.geom = np.array(
+            [
+                [0.0, 0.1],
+                [0.1, 0.09],
+                [1.0, 0.2],
+            ]
+        )
         sys.mesh()
 
-        assert pytest.approx(min(sys.area)) == sys.area_in * sys.area_throat
+        assert pytest.approx(min(sys.area)) == 0.09
 
 
 class TestTube:
@@ -160,11 +160,13 @@ class TestTube1DAero:
     def test_run_once_uniform(self):
         sys = Tube1DAero("tube")
 
+        area_in = 0.1
+        area_exit = 0.1
+        sys.geom = np.array([[0.0, area_in], [1.0, area_exit]])
+
         # numerical solution
         sys.fl_in.W = 1.0
-        mach = IdealDryAir().mach(
-            sys.fl_in.Pt, sys.fl_in.Tt, sys.fl_in.W / sys.area_in, subsonic=True
-        )
+        mach = IdealDryAir().mach(sys.fl_in.Pt, sys.fl_in.Tt, sys.fl_in.W / area_in, subsonic=True)
         sys.Ps_out = IdealDryAir().static_p(sys.fl_in.Pt, sys.fl_in.Tt, mach)
 
         sys.scheme = "LW"
@@ -181,9 +183,9 @@ class TestTube1DAero:
         Pt_in = 100000.0
         Tt_in = 300.0
 
-        length = 1.0
         area_in = 0.1
         area_exit = 0.11
+        sys.geom = np.array([[0.0, area_in], [1.0, area_exit]])
 
         Ps_out = 80000.0
 
@@ -205,10 +207,7 @@ class TestTube1DAero:
         sys.fl_in.Pt = Pt_in
         sys.fl_in.Tt = Tt_in
         sys.Ps_out = Ps_out
-        sys.length = length
         sys.ftol = 1e-3
-        sys.area_in = area_in
-        sys.area_exit = area_exit
         sys.run_once()
 
         assert sys.res < sys.ftol
@@ -225,9 +224,9 @@ class TestTube1DAero:
         Tt_in = 300.0
         W_in = 10.0
 
-        length = 1.0
         area_in = 0.1
         area_exit = 0.2
+        sys.geom = np.array([[0.0, area_in], [1.0, area_exit]])
 
         gas = IdealDryAir()
         mach_in = gas.mach(Pt_in, Tt_in, W_in / area_in, subsonic=False)
@@ -239,10 +238,7 @@ class TestTube1DAero:
         sys.fl_in.Tt = Tt_in
         sys.subsonic = False
 
-        sys.length = length
         sys.ftol = 1e-3
-        sys.area_in = area_in
-        sys.area_exit = area_exit
         sys.run_once()
 
         assert sys.res < sys.ftol
@@ -266,9 +262,9 @@ class TestTube1DAero:
         Tt_in = 300.0
         W_in = 10.0
 
-        length = 1.0
         area_in = 0.1
         area_exit = 0.2
+        sys.geom = np.array([[0.0, area_in], [1.0, area_exit]])
 
         gas = IdealDryAir()
         mach_in = gas.mach(Pt_in, Tt_in, W_in / area_in, subsonic=False)
@@ -281,10 +277,7 @@ class TestTube1DAero:
         sys.subsonic = False
         sys.scheme = "Roe"
 
-        sys.length = length
         sys.ftol = 1e-3
-        sys.area_in = area_in
-        sys.area_exit = area_exit
 
         sys.run_once()
 

@@ -5,30 +5,32 @@ import numpy as np
 from cosapp.base import System
 from pyturbo.ports import FluidPort
 from pyturbo.thermo import IdealDryAir
+from scipy.interpolate import interp1d
 
 
 class Tube1DAero(System):
     """ """
 
     def setup(self):
+        self.add_inward("gas", IdealDryAir())
+
         # inputs/outputs
         self.add_input(FluidPort, "fl_in")
         self.add_output(FluidPort, "fl_out")
 
-        # inwards
-        self.add_inward("gas", IdealDryAir())
-        self.add_inward("f", 0.1, unit="")
-
         # geometry
-        self.add_inward("area_in", 0.1, unit="m**2")
-        self.add_inward("area_exit", 0.1, unit="m**2")
-        self.add_inward("length", 1.0, unit="m")
+        self.add_inward(
+            "geom",
+            np.array(
+                [
+                    [0.0, 0.1],
+                    [1.0, 0.1],
+                ]
+            ),
+        )
 
         # inwards
         self.add_inward("subsonic", True, desc="initial inlet flow status")
-
-        # geometry
-        self.add_inward("area_throat", 1.0, unit="", desc="area throat relative to area inlet")
 
         # aero
         self.add_inward("Ps_out", 50000.0, unit="pa", desc="exit static pressure")
@@ -67,21 +69,17 @@ class Tube1DAero(System):
         self.solver()
 
     def mesh(self):
-        def sigmoid(x):
-            return 1 / (1.0 + np.exp(x))
 
-        def bump(s, a=50, b=0.5):
-            return 4 * (1 - sigmoid(a * (s - b))) * (1 - sigmoid(-a * (s - b)))
+        s_mesh = np.linspace(self.geom[0, 0], self.geom[-1, 0], self.n)
 
-        n = self.n
-        x = np.linspace(-1 / (n - 1), 1 + 1 / (n - 1), n + 2)
+        s_in = 2 * s_mesh[0] - s_mesh[1]
+        s_exit = 2 * s_mesh[-1] - s_mesh[-2]
+        self.x = np.concatenate(([s_in], s_mesh, [s_exit]))
 
-        area_throat = self.area_throat
-        area_in = self.area_in
-        area_exit = self.area_exit
-
-        self.x = self.length * x
-        self.area = ((1 - (1 - area_throat) * bump(x)) * (area_in * (1 - x) + area_exit * x))[1:-1]
+        interp_func = interp1d(
+            self.geom[:, 0], self.geom[:, 1], kind="linear", fill_value="extrapolate"
+        )
+        self.area = interp_func(s_mesh)
 
     def solver(self):
         gas = self.gas
@@ -121,7 +119,7 @@ class Tube1DAero(System):
             m = self.mach_from_q(q[1], area[1])
 
             if m >= 1:  # inlet supersonic, all imposed
-                q[0] = self.q_from_fluid_port(self.fl_in, self.area_in, subsonic=False)
+                q[0] = self.q_from_fluid_port(self.fl_in, area[0], subsonic=False)
             elif 0 <= m < 1:  # inlet subsonic, pt, tt imposed, w extrapolated
                 q[0] = self.q_from_wpt(
                     q[1, 1], self.fl_in.Pt, self.fl_in.Tt, area[0], subsonic=True

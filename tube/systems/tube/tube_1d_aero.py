@@ -47,13 +47,14 @@ class Tube1DAero(System):
 
         # 1d solver
         self.add_inward('n', 101, desc='number of cells')
-        self.add_inward('CFL', 0.9, desc='CFL number')
-        self.add_inward('implicit', False)
+        self.add_inward('CFL', 2.0, desc='CFL number')
+        self.add_inward('implicit', True)
         self.add_inward('scheme', 'Roe')
 
-        self.add_inward('ftol', 1e-3)
+        self.add_inward('ftol', 1e-6)
         self.add_inward('it_max', 10000)
 
+        self.add_outward('invA', None)
         self.add_outward('res', 0.)
         self.add_outward('it', 0)
 
@@ -64,7 +65,6 @@ class Tube1DAero(System):
         # For scheme : https://encyclopediaofmath.org/wiki/Lax-Wendroff_method
         #              https://www.psvolpiani.com/courses
 
-        # solver 
         self.mesh()
         self.solver()
 
@@ -77,6 +77,7 @@ class Tube1DAero(System):
 
         n = self.n
         x = np.linspace(-1/(n-1), 1+1/(n-1), n+2)
+
         area_throat = self.area_throat
         area_in = self.area_in
         area_exit = self.area_exit
@@ -86,40 +87,34 @@ class Tube1DAero(System):
 
     def solver(self):
         gas = self.gas
+
+        # solver
         n = self.n
+        it = 0
+        res = np.inf
+        CFL = self.CFL
 
         # mesh
         area = self.area
         dx = (self.x - np.roll(self.x, 1))[1:-1]
         
-        # boundary conditions
-        W_in = self.fl_in.W
-        Pt_in = self.fl_in.Pt
-        Tt_in = self.fl_in.Tt
-        Ps_out = self.Ps_out
-
         # init flow with input value
         if self.init:
-            W = np.full((n), W_in)
-            Pt = np.full((n), Pt_in)
-            Tt = np.full((n), Tt_in)
+            W = np.full((n), self.fl_in.W)
+            Pt = np.full((n), self.fl_in.Pt)
+            Tt = np.full((n), self.fl_in.Tt)
             
             q = self.q_from_wpt(W, Pt, Tt, area, subsonic=self.subsonic)
             self.init = False
         else:
             q = self.q
 
-        # solver
-        it = 0
-        res = np.inf
-        CFL = self.CFL
-
         # implcit
         if self.implicit:
             A = (1 + CFL**2) * np.diagflat(np.ones((n-2))) \
                     - 0.5 * CFL**2 * np.diagflat(np.ones((n-3)), 1) \
                     - 0.5 * CFL**2 * np.diagflat(np.ones((n-3)), -1)
-            invA = np.linalg.inv(A)
+            self.invA = np.linalg.inv(A)
 
         while (res > self.ftol and it < self.it_max):
             # inlet boundary layer
@@ -128,7 +123,7 @@ class Tube1DAero(System):
             if m >= 1:  # inlet supersonic, all imposed
                 q[0] = self.q_from_fluid_port(self.fl_in, self.area_in, subsonic=False)
             elif 0 <= m < 1:  # inlet subsonic, pt, tt imposed, w extrapolated
-                q[0] = self.q_from_wpt(q[1, 1], Pt_in, Tt_in, area[0], subsonic=True)
+                q[0] = self.q_from_wpt(q[1, 1], self.fl_in.Pt, self.fl_in.Tt, area[0], subsonic=True)
             elif m < 0:  # inlet reverse flow
                 q[0] = q[1]
             else:
@@ -141,10 +136,10 @@ class Tube1DAero(System):
                 q[-1] = q[-2]
             elif 1 > m >= 0:  # outlet subsonic, ps imposed, pt and tt extrapolated
                 _, pt, tt = self.wpt_from_q(q[-2], area[-2])
-                mach = gas.mach_ptpstt(pt, Ps_out, tt)
+                mach = gas.mach_ptpstt(pt, self.Ps_out, tt)
                 ts = gas.static_t(tt, mach)
                 c = gas.c(ts)
-                density = gas.density(Ps_out, ts)
+                density = gas.density(self.Ps_out, ts)
                 w = area[-2] * density * mach * c
 
                 qn = self.q_from_wpt(w, pt, tt, area[-1], subsonic=True)
@@ -170,7 +165,7 @@ class Tube1DAero(System):
 
             # implicit
             if self.implicit:
-                df = np.matmul(invA, df)
+                df = np.matmul(self.invA, df)
 
             # update
             res = np.max(abs(df))
@@ -181,7 +176,7 @@ class Tube1DAero(System):
         # primary variable
         self.density, self.u, self.Ps, E, c = self.rupEc_from_q(q, area)
         self.mach = self.u / c
-        self.Ts = gas.t_from_h(E - 0.5 * u * u + self.Ps/self.density)
+        self.Ts = gas.t_from_h(E - 0.5 * self.u * self.u + self.Ps/self.density)
 
         self.fl_out.W, self.fl_out.Pt, self.fl_out.Tt = self.wpt_from_q(q[-1], area[-1])
 
@@ -275,9 +270,8 @@ class Tube1DAero(System):
             u = q[:, 1] / q[:, 0]
             E = q[:, 2] / q[:, 0]
 
-        p = (gamma-1.)*r*(E-0.5*u*u)
+        p = (gamma-1.)*r*(E-0.5*u*u)        
         c = np.sqrt(gamma*p/r)
-
         return u/c
 
     def rupEc_from_q(self, q, s):
@@ -314,7 +308,8 @@ class Tube1DAero(System):
 
         r, u, ps, E, c = self.rupEc_from_q(q, area)
         mach = u/c
-        ts = gas.t_from_h(E + ps/r - 0.5 * u * u)
+        h = E + ps/r - 0.5 * u * u
+        ts = gas.t_from_h(h)
         tt = gas.total_t(ts, mach)
         pt = gas.total_p(ps, ts, tt)
         return w, pt, tt

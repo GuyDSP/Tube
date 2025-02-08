@@ -158,6 +158,24 @@ class TestTube:
 class TestTube1DAero:
     """Define tests for the structure model."""
 
+    def test_run_once_uniform(self):    
+        sys = Tube1DAero("tube")
+
+        # numerical solution
+        sys.fl_in.W = 1.0
+        mach = IdealDryAir().mach(sys.fl_in.Pt, sys.fl_in.Tt, sys.fl_in.W, subsonic=True)
+        print(mach)
+
+        sys.Ps_out = IdealDryAir().static_p(sys.fl_in.Pt, sys.fl_in.Tt, mach)
+
+        sys.mesh()
+        assert min(sys.area) == pytest.approx(max(sys.area))
+        
+        sys.run_once()
+
+        assert sys.res < sys.ftol
+        assert sys.it == 1
+
     def test_run_once_subsonic(self):    
         sys = Tube1DAero("tube")
 

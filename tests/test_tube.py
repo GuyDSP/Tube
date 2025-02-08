@@ -214,7 +214,7 @@ class TestTube1DAero:
         assert pytest.approx(sys.fl_out.Pt, rel=1e-4) == Pt_in
         assert pytest.approx(sys.fl_out.Tt, rel=1e-4) == Tt_in
         assert pytest.approx(sys.fl_out.W, rel=2e-3) == W_in
-        assert pytest.approx(sys.Ps[-1], rel=1e-3) == Ps_out
+        assert pytest.approx(sys.get_Ps()[-1], rel=1e-3) == Ps_out
 
     def test_run_once_supersonic(self):
         sys = Tube1DAero("tube")
@@ -242,8 +242,8 @@ class TestTube1DAero:
         sys.run_once()
 
         assert sys.res < sys.ftol
-        assert pytest.approx(sys.mach[0], rel=1e-2) == mach_in
-        assert pytest.approx(sys.mach[-1], rel=1e-2) == mach_exit
+        assert pytest.approx(sys.get_mach()[0], rel=1e-2) == mach_in
+        assert pytest.approx(sys.get_mach()[-1], rel=1e-2) == mach_exit
 
         # implicit
         sys.implicit = True
@@ -251,8 +251,8 @@ class TestTube1DAero:
         sys.run_once()
 
         assert sys.res < sys.ftol
-        assert pytest.approx(sys.mach[0], rel=1e-2) == mach_in
-        assert pytest.approx(sys.mach[-1], rel=1e-2) == mach_exit
+        assert pytest.approx(sys.get_mach()[0], rel=1e-2) == mach_in
+        assert pytest.approx(sys.get_mach()[-1], rel=1e-2) == mach_exit
 
     def test_run_once_supersonic_Roe(self):
         sys = Tube1DAero("tube")
@@ -282,5 +282,5 @@ class TestTube1DAero:
         sys.run_once()
 
         assert sys.res < sys.ftol
-        assert pytest.approx(sys.mach[0], rel=1e-2) == mach_in
-        assert pytest.approx(sys.mach[-1], rel=1e-2) == mach_exit
+        assert pytest.approx(sys.get_mach()[0], rel=1e-2) == mach_in
+        assert pytest.approx(sys.get_mach()[-1], rel=1e-2) == mach_exit

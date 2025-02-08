@@ -35,16 +35,6 @@ class Tube1DAero(System):
         # aero
         self.add_inward("Ps_out", 50000.0, unit="pa", desc="exit static pressure")
 
-        # outwards
-        self.add_outward("Ps", np.array(()))
-        self.add_outward("Ts", np.array(()))
-        self.add_outward("u", np.array(()))
-        self.add_outward("mach", np.array(()))
-        self.add_outward("density", np.array(()))
-        self.add_outward("x")
-        self.add_outward("q")
-        self.add_outward("area")
-
         # 1d solver
         self.add_inward("n", 101, desc="number of cells")
         self.add_inward("CFL", 2.0, desc="CFL number")
@@ -54,11 +44,12 @@ class Tube1DAero(System):
         self.add_inward("ftol", 1e-6)
         self.add_inward("it_max", 10000)
 
-        self.add_outward("invA", None)
+        self.add_outward("x", None)
+        self.add_outward("q", None)
+        self.add_outward("area", None)
+
         self.add_outward("res", 0.0)
         self.add_outward("it", 0)
-
-        self.add_outward("init", True)
 
     def compute(self):
         # For 1D modelisation : https://perso.univ-lyon1.fr/marc.buffat/COURS/AERO_HTML/node45.html
@@ -95,13 +86,12 @@ class Tube1DAero(System):
         dx = (self.x - np.roll(self.x, 1))[1:-1]
 
         # init flow with input value
-        if self.init:
+        if self.q is None:
             W = np.full((n), self.fl_in.W)
             Pt = np.full((n), self.fl_in.Pt)
             Tt = np.full((n), self.fl_in.Tt)
 
             q = self.q_from_wpt(W, Pt, Tt, area, subsonic=self.subsonic)
-            self.init = False
         else:
             q = self.q
 
@@ -112,7 +102,7 @@ class Tube1DAero(System):
                 - 0.5 * CFL**2 * np.diagflat(np.ones((n - 3)), 1)
                 - 0.5 * CFL**2 * np.diagflat(np.ones((n - 3)), -1)
             )
-            self.invA = np.linalg.inv(A)
+            invA = np.linalg.inv(A)
 
         while res > self.ftol and it < self.it_max:
             # inlet boundary layer
@@ -164,7 +154,7 @@ class Tube1DAero(System):
 
             # implicit
             if self.implicit:
-                df = np.matmul(self.invA, df)
+                df = np.matmul(invA, df)
 
             # update
             res = np.max(abs(df))
@@ -173,9 +163,6 @@ class Tube1DAero(System):
             it += 1
 
         # primary variable
-        self.density, self.u, self.Ps, E, c = self.rupEc_from_q(q, area)
-        self.mach = self.u / c
-        self.Ts = gas.t_from_h(E - 0.5 * self.u * self.u + self.Ps / self.density)
 
         self.fl_out.W, self.fl_out.Pt, self.fl_out.Tt = self.wpt_from_q(q[-2], area[-2])
 
@@ -183,6 +170,18 @@ class Tube1DAero(System):
         self.it = it
 
         self.q = q
+
+    def get_u(self):
+        _, u, _, _, _ = self.rupEc_from_q(self.q, self.area)
+        return u
+
+    def get_Ps(self):
+        _, _, Ps, _, _ = self.rupEc_from_q(self.q, self.area)
+        return Ps
+
+    def get_mach(self):
+        _, u, _, _, c = self.rupEc_from_q(self.q, self.area)
+        return u / c
 
     def flux_LW(self, q, dt, dx, s):
         # flux at cell center

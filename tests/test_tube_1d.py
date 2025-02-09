@@ -6,6 +6,8 @@ import pytest
 from pyturbo.thermo import IdealDryAir
 from scipy.optimize import fsolve
 
+from cosapp.drivers import NonLinearSolver
+
 from tube.systems.tube import Tube1D, Tube1DAero, Tube1DGeom, Tube1DMech
 
 
@@ -139,6 +141,15 @@ class TestTube1D:
         sys = Tube1D("tube")
         sys.run_once()
         assert sys.aero.res < sys.aero.ftol
+
+    def test_run_driver(self):
+        sys = Tube1D("tube")
+        solver = sys.add_driver(NonLinearSolver('solver'))
+        sys.run_drivers()
+        residu = np.linalg.norm(solver.problem.residue_vector())
+
+        assert sys.aero.res < sys.aero.ftol
+        assert residu < 1e-6
 
     def test_run_once_uniform(self):
         """Test Tube1D in uniform conditions."""

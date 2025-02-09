@@ -29,3 +29,4 @@ class Tube1D(System):
         # connections
         self.connect(self.geom.outwards, self.mech.inwards, {"geom": "geom_cold"})
         self.connect(self.mech.outwards, self.aero.inwards, ["geom"])
+        self.connect(self.aero.outwards, self.mech.inwards, ["Ps"])

@@ -42,7 +42,7 @@ class Tube1DAero(System):
         self.add_inward("subsonic", True, desc="initial inlet flow status")
 
         # outwards
-        self.add_outward("Ps", None, desc="static pressure")
+        self.add_outward("Ps", lambda s: 101325.0, desc="static pressure")
 
         # 1d solver
         self.add_inward("n", 11, desc="number of cells")

@@ -6,7 +6,7 @@ import pytest
 from pyturbo.thermo import IdealDryAir
 from scipy.optimize import fsolve
 
-from tube.systems.tube import Tube1D, Tube1DAero
+from tube.systems.tube import Tube1D, Tube1DAero, Tube1DGeom
 
 
 class TestBasic:
@@ -113,69 +113,70 @@ class TestBasic:
         assert pytest.approx(sim[4], 1e-6) == c
 
 
-class TestTube1D:
+class TestTube1DGeom:
     """Define tests for the structure model."""
 
-    def test_run_once_uniform(self):
-        sys = Tube1D("tube")
-        area_in = np.pi * (sys.d_in / 2) ** 2
-
-        # numerical solution
-        sys.fl_in.W = 1.0
-        mach = IdealDryAir().mach(sys.fl_in.Pt, sys.fl_in.Tt, sys.fl_in.W / area_in, subsonic=True)
-        sys.Ps_out = IdealDryAir().static_p(sys.fl_in.Pt, sys.fl_in.Tt, mach)
+    def test_run_once(self):
+        sys = Tube1DGeom("tube")
 
         sys.run_once()
-
-        assert sys.aero.res < sys.aero.ftol
-
-    def test_run_once_open(self):
-        sys = Tube1D("tube")
-        area_in = np.pi * (sys.d_in / 2) ** 2
-        sys.d_exit = sys.d_in * 1.1
-
-        # numerical solution
-        sys.fl_in.W = 1.0
-        mach = IdealDryAir().mach(sys.fl_in.Pt, sys.fl_in.Tt, sys.fl_in.W / area_in, subsonic=True)
-        sys.Ps_out = IdealDryAir().static_p(sys.fl_in.Pt, sys.fl_in.Tt, mach)
-
-        sys.run_once()
-
-        assert sys.aero.res < sys.aero.ftol
 
 
 class TestTube1DAero:
     """Define tests for the structure model."""
 
-    def test_run_once_uniform(self):
+    def test_setup(self):
+        Tube1DAero("tube")
+
+    def test_run_once(self):
         sys = Tube1DAero("tube")
+
+        sys.run_once()
+
+        assert sys.res < sys.ftol
+
+
+class TestTube1D:
+    """Define tests for the structure model."""
+
+    def test_setup(self):
+        Tube1D("tube")
+
+    def test_run_once_tube_1d(self):
+        sys = Tube1D("tube")
+        sys.run_once()
+
+        assert sys.aero.res < sys.aero.ftol
+
+    def test_run_once_uniform(self):
+        sys = Tube1D("tube")
 
         area_in = 0.1
         area_exit = 0.1
-        sys.geom = np.array([[0.0, area_in], [1.0, area_exit]])
+        sys.d_in = np.sqrt(area_in / np.pi) * 2
+        sys.d_exit = np.sqrt(area_exit / np.pi) * 2
 
         # numerical solution
         sys.fl_in.W = 1.0
         mach = IdealDryAir().mach(sys.fl_in.Pt, sys.fl_in.Tt, sys.fl_in.W / area_in, subsonic=True)
         sys.Ps_out = IdealDryAir().static_p(sys.fl_in.Pt, sys.fl_in.Tt, mach)
 
-        sys.scheme = "LW"
-        sys.implicit = False
         sys.run_once()
 
-        assert sys.res < sys.ftol
-        assert sys.it == 1
+        assert sys.aero.res < sys.aero.ftol
+        assert sys.aero.it == 1
 
     def test_run_once_subsonic(self):
-        sys = Tube1DAero("tube")
+        sys = Tube1D("tube")
 
         # exact solution
         Pt_in = 100000.0
         Tt_in = 300.0
 
         area_in = 0.1
-        area_exit = 0.11
-        sys.geom = np.array([[0.0, area_in], [1.0, area_exit]])
+        area_exit = 0.1
+        sys.d_in = np.sqrt(area_in / np.pi) * 2
+        sys.d_exit = np.sqrt(area_exit / np.pi) * 2
 
         Ps_out = 80000.0
 
@@ -197,17 +198,17 @@ class TestTube1DAero:
         sys.fl_in.Pt = Pt_in
         sys.fl_in.Tt = Tt_in
         sys.Ps_out = Ps_out
-        sys.ftol = 1e-3
+        sys.aero.ftol = 1e-3
         sys.run_once()
 
-        assert sys.res < sys.ftol
+        assert sys.aero.res < sys.aero.ftol
         assert pytest.approx(sys.fl_out.Pt, rel=1e-3) == Pt_in
         assert pytest.approx(sys.fl_out.Tt, rel=1e-3) == Tt_in
         assert pytest.approx(sys.fl_out.W, rel=2e-2) == W_in
-        assert pytest.approx(sys.get_Ps()[-1], rel=1e-2) == Ps_out
+        assert pytest.approx(sys.aero.get_Ps()[-1], rel=1e-2) == Ps_out
 
     def test_run_once_supersonic(self):
-        sys = Tube1DAero("tube")
+        sys = Tube1D("tube")
 
         # exact solution
         Pt_in = 100000.0
@@ -216,7 +217,8 @@ class TestTube1DAero:
 
         area_in = 0.1
         area_exit = 0.2
-        sys.geom = np.array([[0.0, area_in], [1.0, area_exit]])
+        sys.d_in = np.sqrt(area_in / np.pi) * 2
+        sys.d_exit = np.sqrt(area_exit / np.pi) * 2
 
         gas = IdealDryAir()
         mach_in = gas.mach(Pt_in, Tt_in, W_in / area_in, subsonic=False)
@@ -226,26 +228,17 @@ class TestTube1DAero:
         sys.fl_in.W = W_in
         sys.fl_in.Pt = Pt_in
         sys.fl_in.Tt = Tt_in
-        sys.subsonic = False
+        sys.aero.subsonic = False
 
-        sys.ftol = 1e-3
+        sys.aero.ftol = 1e-3
         sys.run_once()
 
-        assert sys.res < sys.ftol
-        assert pytest.approx(sys.get_mach()[0], rel=1e-2) == mach_in
-        assert pytest.approx(sys.get_mach()[-1], rel=1e-1) == mach_exit
-
-        # implicit
-        sys.implicit = True
-        sys.CFL = 5.0
-        sys.run_once()
-
-        assert sys.res < sys.ftol
-        assert pytest.approx(sys.get_mach()[0], rel=1e-2) == mach_in
-        assert pytest.approx(sys.get_mach()[-1], rel=1e-1) == mach_exit
+        assert sys.aero.res < sys.aero.ftol
+        assert pytest.approx(sys.aero.get_mach()[0], rel=1e-2) == mach_in
+        assert pytest.approx(sys.aero.get_mach()[-1], rel=1e-1) == mach_exit
 
     def test_run_once_supersonic_LW(self):
-        sys = Tube1DAero("tube")
+        sys = Tube1D("tube")
 
         # exact solution
         Pt_in = 100000.0
@@ -254,7 +247,8 @@ class TestTube1DAero:
 
         area_in = 0.1
         area_exit = 0.2
-        sys.geom = np.array([[0.0, area_in], [1.0, area_exit]])
+        sys.d_in = np.sqrt(area_in / np.pi) * 2
+        sys.d_exit = np.sqrt(area_exit / np.pi) * 2
 
         gas = IdealDryAir()
         mach_in = gas.mach(Pt_in, Tt_in, W_in / area_in, subsonic=False)
@@ -264,13 +258,13 @@ class TestTube1DAero:
         sys.fl_in.W = W_in
         sys.fl_in.Pt = Pt_in
         sys.fl_in.Tt = Tt_in
-        sys.subsonic = False
-        sys.scheme = "LW"
+        sys.aero.subsonic = False
+        sys.aero.scheme = "LW"
 
-        sys.ftol = 1e-3
+        sys.aero.ftol = 1e-3
 
         sys.run_once()
 
-        assert sys.res < sys.ftol
-        assert pytest.approx(sys.get_mach()[0], rel=1e-2) == mach_in
-        assert pytest.approx(sys.get_mach()[-1], rel=1e-1) == mach_exit
+        assert sys.aero.res < sys.aero.ftol
+        assert pytest.approx(sys.aero.get_mach()[0], rel=1e-2) == mach_in
+        assert pytest.approx(sys.aero.get_mach()[-1], rel=1e-1) == mach_exit

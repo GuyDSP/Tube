@@ -3,6 +3,7 @@
 
 import numpy as np
 from cosapp.systems import System
+from scipy.interpolate import interp1d
 
 
 class Tube1DGeom(System):
@@ -31,12 +32,16 @@ class Tube1DGeom(System):
         self.add_inward("length", 1.0, unit="m")
 
         # aero
-        self.add_outward("geom", np.empty((0, 2)))
+        self.add_outward("geom", lambda s: 0.1)
 
     def compute(self):
-        self.geom = np.array(
+        points = np.array(
             [
                 [0.0, np.pi * (self.d_in / 2) ** 2],
                 [self.length, np.pi * (self.d_exit / 2) ** 2],
             ]
         )
+
+        self.geom = lambda s: interp1d(
+            points[:, 0], points[:, 1], kind="linear", fill_value="extrapolate"
+        )(s)

@@ -25,13 +25,16 @@ class Tube1DAero(System):
         self.add_output(FluidPort, "fl_out")
 
         # geometry
+        points = np.array(
+            [
+                [0.0, 0.1],
+                [1.0, 0.1],
+            ]
+        )
         self.add_inward(
             "geom",
-            np.array(
-                [
-                    [0.0, 0.1],
-                    [1.0, 0.1],
-                ]
+            lambda s: interp1d(points[:, 0], points[:, 1], kind="linear", fill_value="extrapolate")(
+                s
             ),
         )
 
@@ -59,16 +62,13 @@ class Tube1DAero(System):
         #              https://www.psvolpiani.com/courses
 
         # mesh
-        s_mesh = np.linspace(self.geom[0, 0], self.geom[-1, 0], self.n)
+        s_mesh = np.linspace(0.0, 1.0, self.n)
 
         s_in = 2 * s_mesh[0] - s_mesh[1]
         s_exit = 2 * s_mesh[-1] - s_mesh[-2]
         self._x = np.concatenate(([s_in], s_mesh, [s_exit]))
 
-        interp_func = interp1d(
-            self.geom[:, 0], self.geom[:, 1], kind="linear", fill_value="extrapolate"
-        )
-        self._area = interp_func(s_mesh)
+        self._area = self.geom(s_mesh)
 
         # solver
         gas = self.gas

@@ -11,6 +11,12 @@ from scipy.interpolate import interp1d
 class Tube1DAero(System):
     """ """
 
+    def __init__(self, name):
+        self._area = None
+        self._x = None
+        self._q = None
+        super().__init__(name)
+
     def setup(self):
         self.add_inward("gas", IdealDryAir())
 
@@ -44,10 +50,6 @@ class Tube1DAero(System):
         self.add_inward("ftol", 1e-6)
         self.add_inward("it_max", 10000)
 
-        self.add_outward("x", None)
-        self.add_outward("q", None)
-        self.add_outward("area", None)
-
         self.add_outward("res", 0.0)
         self.add_outward("it", 0)
 
@@ -56,44 +58,39 @@ class Tube1DAero(System):
         # For scheme : https://encyclopediaofmath.org/wiki/Lax-Wendroff_method
         #              https://www.psvolpiani.com/courses
 
-        self.mesh()
-        self.solver()
-
-    def mesh(self):
-
+        # mesh
         s_mesh = np.linspace(self.geom[0, 0], self.geom[-1, 0], self.n)
 
         s_in = 2 * s_mesh[0] - s_mesh[1]
         s_exit = 2 * s_mesh[-1] - s_mesh[-2]
-        self.x = np.concatenate(([s_in], s_mesh, [s_exit]))
+        self._x = np.concatenate(([s_in], s_mesh, [s_exit]))
 
         interp_func = interp1d(
             self.geom[:, 0], self.geom[:, 1], kind="linear", fill_value="extrapolate"
         )
-        self.area = interp_func(s_mesh)
-
-    def solver(self):
-        gas = self.gas
+        self._area = interp_func(s_mesh)
 
         # solver
+        gas = self.gas
+
         n = self.n
         it = 0
         res = np.inf
         CFL = self.CFL
 
         # mesh
-        area = self.area
-        dx = (self.x - np.roll(self.x, 1))[1:-1]
+        area = self._area
+        dx = (self._x - np.roll(self._x, 1))[1:-1]
 
         # init flow with input value
-        if self.q is None:
+        if self._q is None:
             W = np.full((n), self.fl_in.W)
             Pt = np.full((n), self.fl_in.Pt)
             Tt = np.full((n), self.fl_in.Tt)
 
             q = self.q_from_wpt(W, Pt, Tt, area, subsonic=self.subsonic)
         else:
-            q = self.q
+            q = self._q
 
         # implcit
         if self.implicit:
@@ -169,18 +166,18 @@ class Tube1DAero(System):
         self.res = res
         self.it = it
 
-        self.q = q
+        self._q = q
 
     def get_u(self):
-        _, u, _, _, _ = self.rupEc_from_q(self.q, self.area)
+        _, u, _, _, _ = self.rupEc_from_q(self._q, self._area)
         return u
 
     def get_Ps(self):
-        _, _, Ps, _, _ = self.rupEc_from_q(self.q, self.area)
+        _, _, Ps, _, _ = self.rupEc_from_q(self._q, self._area)
         return Ps
 
     def get_mach(self):
-        _, u, _, _, c = self.rupEc_from_q(self.q, self.area)
+        _, u, _, _, c = self.rupEc_from_q(self._q, self._area)
         return u / c
 
     def flux_LW(self, q, dt, dx, s):
@@ -265,18 +262,7 @@ class Tube1DAero(System):
         return df
 
     def mach_from_q(self, q, s):
-        gamma = self.gas.gamma(0.0)
-        if q.ndim == 1:
-            r = q[0] / s
-            u = q[1] / q[0]
-            E = q[2] / q[0]
-        else:
-            r = q[:, 0] / s
-            u = q[:, 1] / q[:, 0]
-            E = q[:, 2] / q[:, 0]
-
-        p = (gamma - 1.0) * r * (E - 0.5 * u * u)
-        c = np.sqrt(gamma * p / r)
+        _, u, _, _, c = self.rupEc_from_q(q, s)
         return u / c
 
     def rupEc_from_q(self, q, s):

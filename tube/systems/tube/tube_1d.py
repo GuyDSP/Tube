@@ -3,7 +3,7 @@
 
 from cosapp.systems import System
 
-from tube.systems.tube import Tube1DAero, Tube1DGeom
+from tube.systems.tube import Tube1DAero, Tube1DGeom, Tube1DMech
 
 
 class Tube1D(System):
@@ -23,7 +23,9 @@ class Tube1D(System):
     def setup(self):
         # Physics
         self.add_child(Tube1DGeom("geom"), pulling=["d_in", "d_exit", "length"])
-        self.add_child(Tube1DAero("aero"), pulling=["fl_in", "fl_out", "Ps_out"])
+        self.add_child(Tube1DMech("mech"))
+        self.add_child(Tube1DAero("aero"), pulling=["fl_in", "fl_out"])
 
         # connections
-        self.connect(self.geom.outwards, self.aero.inwards, ["geom"])
+        self.connect(self.geom.outwards, self.mech.inwards, {"geom": "geom_cold"})
+        self.connect(self.mech.outwards, self.aero.inwards, ["geom"])

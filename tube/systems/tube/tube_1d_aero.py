@@ -41,8 +41,8 @@ class Tube1DAero(System):
         # inwards
         self.add_inward("subsonic", True, desc="initial inlet flow status")
 
-        # aero
-        self.add_inward("Ps_out", 50000.0, unit="pa", desc="exit static pressure")
+        # outwards
+        self.add_outward("Ps", None, desc="static pressure")
 
         # 1d solver
         self.add_inward("n", 11, desc="number of cells")
@@ -123,10 +123,12 @@ class Tube1DAero(System):
                 q[-1] = q[-2]
             elif 1 > m >= 0:  # outlet subsonic, ps imposed, pt and tt extrapolated
                 _, pt, tt = self.wpt_from_q(q[-2], area[-2])
-                mach = gas.mach_ptpstt(pt, self.Ps_out, tt)
+                ps = gas.static_p(pt, tt, m)
+
+                mach = gas.mach_ptpstt(pt, ps, tt)
                 ts = gas.static_t(tt, mach)
                 c = gas.c(ts)
-                density = gas.density(self.Ps_out, ts)
+                density = gas.density(ps, ts)
                 w = area[-2] * density * mach * c
 
                 qn = self.q_from_wpt(w, pt, tt, area[-1], subsonic=True)
@@ -168,13 +170,12 @@ class Tube1DAero(System):
 
         self._q = q
 
+        _, _, Ps, _, _ = self.rupEc_from_q(self._q, self._area)
+        self.Ps = lambda s: interp1d(self._x[1:-1], Ps, kind="linear", fill_value="extrapolate")(s)
+
     def get_u(self):
         _, u, _, _, _ = self.rupEc_from_q(self._q, self._area)
         return u
-
-    def get_Ps(self):
-        _, _, Ps, _, _ = self.rupEc_from_q(self._q, self._area)
-        return Ps
 
     def get_mach(self):
         _, u, _, _, c = self.rupEc_from_q(self._q, self._area)

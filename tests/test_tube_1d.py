@@ -117,6 +117,7 @@ class TestTube1DAero:
         sys.run_once()
         assert sys.res < sys.ftol
 
+
 class TestTube1DMech:
     """Define tests for the Tube1DAero model."""
 
@@ -126,6 +127,7 @@ class TestTube1DMech:
     def test_run_once(self):
         sys = Tube1DMech("tube")
         sys.run_once()
+
 
 class TestTube1D:
     """Define tests for the Tube1D model."""
@@ -147,10 +149,7 @@ class TestTube1D:
 
         # Numerical solution
         sys.fl_in.W = 1.0
-        gas = IdealDryAir()
         sys.fl_in.Pt, sys.fl_in.Tt = 100000.0, 300.0
-        mach = gas.mach(sys.fl_in.Pt, sys.fl_in.Tt, sys.fl_in.W / area_in, subsonic=True)
-        sys.Ps_out = gas.static_p(sys.fl_in.Pt, sys.fl_in.Tt, mach)
 
         sys.run_once()
 
@@ -161,14 +160,14 @@ class TestTube1D:
         """Test Tube1D in subsonic conditions."""
         sys = Tube1D("tube")
         gas = IdealDryAir()
-        Pt_in, Tt_in, Ps_out = 100000.0, 300.0, 80000.0
+        Pt_in, Tt_in, ps_exit = 100000.0, 300.0, 80000.0
         area_in, area_exit = 0.1, 0.1
 
         sys.d_in = np.sqrt(area_in / np.pi) * 2
         sys.d_exit = np.sqrt(area_exit / np.pi) * 2
 
         def mass_flow(W):
-            return Ps_out - gas.static_p(
+            return ps_exit - gas.static_p(
                 Pt_in, Tt_in, gas.mach(Pt_in, Tt_in, W[0] / area_exit, subsonic=True)
             )
 
@@ -176,12 +175,11 @@ class TestTube1D:
 
         # Numerical solution
         sys.fl_in.W = W_in * 1.01
-        sys.fl_in.Pt, sys.fl_in.Tt, sys.Ps_out = Pt_in, Tt_in, Ps_out
-        sys.aero.ftol = 1e-3
+        sys.fl_in.Pt, sys.fl_in.Tt = Pt_in, Tt_in
         sys.run_once()
 
         assert sys.aero.res < sys.aero.ftol
         assert pytest.approx(sys.fl_out.Pt, rel=1e-3) == Pt_in
         assert pytest.approx(sys.fl_out.Tt, rel=1e-3) == Tt_in
         assert pytest.approx(sys.fl_out.W, rel=2e-2) == W_in
-        assert pytest.approx(sys.aero.get_Ps()[-1], rel=1e-2) == Ps_out
+        assert sys.aero.Ps(1) > ps_exit

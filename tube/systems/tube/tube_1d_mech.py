@@ -13,19 +13,19 @@ class Tube1DMech(System):
 
     def setup(self):
         # Geometry (Initial and Deformed)
-        self.add_inward("geom_cold", lambda s: 0.1, unit="m")  # Initial cross-sectional area (m²)
-        self.add_outward("geom", lambda s: 0.1, unit="m")  # Deformed cross-sectional area (m²)
+        self.add_inward("geom_cold", lambda s: 0.1)  # Initial cross-sectional area (m²)
+        self.add_outward("geom", lambda s: 0.1)  # Deformed cross-sectional area (m²)
 
         # Mechanical properties
         self.add_inward("E", 0.1e9, unit="pa")  # Young's modulus (Pa)
-        self.add_inward("thickness", 0.1e-3, unit="m")  # Thickness (converted to meters)
+        self.add_inward("thickness", 1.0e-3, unit="m")  # Thickness (converted to meters)
 
         # Aero (Pressure field)
-        self.add_inward("Ps", lambda s: 101325.0, unit="pa")  # Pressure (Pa)
+        self.add_inward("Ps", lambda s: 101325.0)  # Pressure (Pa)
 
     def compute(self):
         """Compute the deformed geometry based on pressure."""
-        
+
         def deformed_area(s):
             """Compute the deformed cross-sectional area at a given position s."""
             # Initial area and radius

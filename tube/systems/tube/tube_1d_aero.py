@@ -42,7 +42,7 @@ class Tube1DAero(System):
         self.add_inward("Ps_out", 50000.0, unit="pa", desc="exit static pressure")
 
         # 1d solver
-        self.add_inward("n", 101, desc="number of cells")
+        self.add_inward("n", 11, desc="number of cells")
         self.add_inward("CFL", 2.0, desc="CFL number")
         self.add_inward("implicit", True)
         self.add_inward("scheme", "Roe")

@@ -4,6 +4,7 @@
 import numpy as np
 from cosapp.systems import System
 from pyturbo.ports import FluidPort
+from pyturbo.thermo import IdealDryAir
 
 
 class TubeAero(System):
@@ -32,19 +33,23 @@ class TubeAero(System):
         self.add_output(FluidPort, "fl_out")
 
         # inwards
+        self.add_inward("gas", IdealDryAir())
         self.add_inward("f", 0.1, unit="")
 
         # outwards
         self.add_outward("ps_in", 1e5, unit="pa")
         self.add_outward("ps_exit", 1e5, unit="pa")
+        self.add_outward("mach_in", 0.0, unit="")
+        self.add_outward("mach_exit", 0.0, unit="")
 
         # geometry
         self.add_inward("area_in", 0.1, unit="m**2")
         self.add_inward("area_exit", 0.1, unit="m**2")
-        self.add_inward("length", 0.1, unit="m**2")
+        self.add_inward("length", 1.0, unit="m")
 
     def compute(self):
-        rho = 1000.0
+        # approx rho
+        rho = self.gas.density(self.fl_in.Pt, self.fl_in.Tt)
 
         # nominal output computation from Darcy-Weisbach equation
         self.fl_out.W = self.fl_in.W

@@ -14,18 +14,15 @@ class Tube1DMech(System):
 
     def setup(self, connection_size=4):
         # Geometry (Initial and Deformed)
-        self.add_inward("geom_cold", lambda s: 0.1)  # Initial cross-sectional area (m²)
-        self.add_outward("geom", lambda s: 0.1)  # Deformed cross-sectional area (m²)
+        self.add_inward("section_cold", lambda s: 0.1)  # Initial cross-sectional area (m²)
+        self.add_outward("section", lambda s: 0.1)  # Deformed cross-sectional area (m²)
 
         # Mechanical properties
         self.add_inward("E", 0.1e9, unit="pa")  # Young's modulus (Pa)
         self.add_inward("thickness", 1.0e-3, unit="m")  # Thickness (converted to meters)
 
         # Aero (Pressure field)
-        s_values = np.linspace(0, 1, connection_size)
-        ps_values = np.full(connection_size, 101325.0)
-
-        self.add_inward("Ps", np.column_stack((s_values, ps_values)), unit="pa")
+        self.add_inward("Ps", np.full(connection_size, 101325.0), unit="pa")
 
     def compute(self):
         """Compute the deformed geometry based on pressure."""
@@ -33,11 +30,12 @@ class Tube1DMech(System):
         def deformed_area(s):
             """Compute the deformed cross-sectional area at a given position s."""
             # Initial area and radius
-            A_cold = self.geom_cold(s)  # Initial cross-sectional area (m²)
+            A_cold = self.section_cold(s)  # Initial cross-sectional area (m²)
             R_cold = np.sqrt(A_cold / np.pi)  # Compute initial radius (m)
 
             # Pressure at position s
-            P = interp1d(self.Ps[:, 0], self.Ps[:, 1], kind="linear", fill_value="extrapolate")(s)
+            ps_mesh = np.linspace(0.0, 1.0, len(self.Ps))
+            P = interp1d(ps_mesh, self.Ps, kind="linear", fill_value="extrapolate")(s)
 
             # Tube material properties
             E = self.E  # Young's modulus (Pa)
@@ -53,4 +51,4 @@ class Tube1DMech(System):
             return A_new  # Return updated area
 
         # Update the deformed geometry function
-        self.geom = lambda s: deformed_area(s)
+        self.section = lambda s: deformed_area(s)

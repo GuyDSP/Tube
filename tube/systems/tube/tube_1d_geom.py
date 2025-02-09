@@ -11,18 +11,8 @@ class Tube1DGeom(System):
 
     Inputs
     ------
-    d_in[m]: float
-        inlet diameter
-    d_exit[m]: float
-        exit diameter
-    length[m]: float
-        tube length
     Outputs
     -------
-    area_in[m**2]: float
-        inlet area flow section
-    area_exit[m**2]: float
-        exit area flow section
     """
 
     def setup(self):
@@ -32,7 +22,7 @@ class Tube1DGeom(System):
         self.add_inward("length", 1.0, unit="m")
 
         # aero
-        self.add_outward("geom", lambda s: 0.1)
+        self.add_outward("section", lambda s: 0.1)
 
     def compute(self):
         points = np.array(
@@ -42,6 +32,6 @@ class Tube1DGeom(System):
             ]
         )
 
-        self.geom = lambda s: interp1d(
+        self.section = lambda s: interp1d(
             points[:, 0], points[:, 1], kind="linear", fill_value="extrapolate"
         )(s)

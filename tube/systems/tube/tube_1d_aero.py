@@ -12,8 +12,6 @@ class Tube1DAero(System):
     """ """
 
     def __init__(self, name, **kwargs):
-        self._area = None
-        self._x = None
         self._q = None
         super().__init__(name, **kwargs)
 
@@ -27,25 +25,21 @@ class Tube1DAero(System):
         # geometry
         points = np.array(
             [
-                [0.0, 0.1],
-                [1.0, 0.1],
+                0.1,
+                0.1,
             ]
         )
+        s_mesh = np.linspace(0.0, 1.0, len(points))
         self.add_inward(
-            "geom",
-            lambda s: interp1d(points[:, 0], points[:, 1], kind="linear", fill_value="extrapolate")(
-                s
-            ),
+            "section",
+            lambda s: interp1d(s_mesh, points, kind="linear", fill_value="extrapolate")(s),
         )
 
         # inwards
         self.add_inward("subsonic", True, desc="initial inlet flow status")
 
         # outwards
-        s_values = np.linspace(0, 1, connection_size)
-        ps_values = np.full(connection_size, 101325.0)
-
-        self.add_outward("Ps", np.column_stack((s_values, ps_values)), unit="pa")
+        self.add_outward("Ps", np.full(connection_size, 101325.0), unit="pa")
 
         # 1d solver
         self.add_inward("n", 11, desc="number of cells")
@@ -69,21 +63,17 @@ class Tube1DAero(System):
 
         s_in = 2 * s_mesh[0] - s_mesh[1]
         s_exit = 2 * s_mesh[-1] - s_mesh[-2]
-        self._x = np.concatenate(([s_in], s_mesh, [s_exit]))
 
-        self._area = self.geom(s_mesh)
+        x = np.concatenate(([s_in], s_mesh, [s_exit]))
+
+        area = self.section(s_mesh)
+        dx = (x - np.roll(x, 1))[1:-1]
 
         # solver
-        gas = self.gas
-
         n = self.n
         it = 0
         res = np.inf
         CFL = self.CFL
-
-        # mesh
-        area = self._area
-        dx = (self._x - np.roll(self._x, 1))[1:-1]
 
         # init flow with input value
         if self._q is None:
@@ -95,7 +85,7 @@ class Tube1DAero(System):
         else:
             q = self._q
 
-        # implcit
+        # init implicit
         if self.implicit:
             A = (
                 (1 + CFL**2) * np.diagflat(np.ones((n - 2)))
@@ -105,43 +95,14 @@ class Tube1DAero(System):
             invA = np.linalg.inv(A)
 
         while res > self.ftol and it < self.it_max:
-            # inlet boundary layer
-            m = self.mach_from_q(q[1], area[1])
-
-            if m >= 1:  # inlet supersonic, all imposed
-                q[0] = self.q_from_fluid_port(self.fl_in, area[0], subsonic=False)
-            elif 0 <= m < 1:  # inlet subsonic, pt, tt imposed, w extrapolated
-                q[0] = self.q_from_wpt(
-                    q[1, 1], self.fl_in.Pt, self.fl_in.Tt, area[0], subsonic=True
-                )
-            elif m < 0:  # inlet reverse flow
-                q[0] = q[1]
-            else:
-                raise ValueError("negative flow at inlet")
-
-            # outlet bondary layer
-            m = self.mach_from_q(q[-2], area[-2])
-
-            if m >= 1:  # outlet supersonic, all extrapolated
-                q[-1] = q[-2]
-            elif 1 > m >= 0:  # outlet subsonic, ps imposed, pt and tt extrapolated
-                _, pt, tt = self.wpt_from_q(q[-2], area[-2])
-                ps = gas.static_p(pt, tt, m)
-
-                mach = gas.mach_ptpstt(pt, ps, tt)
-                ts = gas.static_t(tt, mach)
-                c = gas.c(ts)
-                density = gas.density(ps, ts)
-                w = area[-2] * density * mach * c
-
-                qn = self.q_from_wpt(w, pt, tt, area[-1], subsonic=True)
-                q[-1] = qn
-            else:
-                raise ValueError("negative speed at exit")
+            # apply boundary conditions
+            self.apply_inlet_boundary(q, area)
+            self.apply_outlet_boundary(q, area)
 
             # schemes in conservative form
             _, u, p, _, c = self.rupEc_from_q(q, area)
             dt = CFL * dx / (abs(u) + c)
+
             if self.scheme == "LW":
                 f12 = self.flux_LW(q, dt, dx, area)
             elif self.scheme == "Roe":
@@ -154,7 +115,7 @@ class Tube1DAero(System):
             # sources : wall boundarylayer
             df[:, 1] -= p[1:-1] * (np.roll(area, 1) - area)[1:-1]
 
-            # implicit
+            # apply implicit
             if self.implicit:
                 df = np.matmul(invA, df)
 
@@ -170,24 +131,44 @@ class Tube1DAero(System):
 
         self.res = res
         self.it = it
-
         self._q = q
 
-        _, _, Ps, _, _ = self.rupEc_from_q(self._q, self._area)
+        _, _, Ps, _, _ = self.rupEc_from_q(q, area)
 
         def func(s):
-            return interp1d(self._x[1:-1], Ps, kind="linear", fill_value="extrapolate")(s)
+            return interp1d(x[1:-1], Ps, kind="linear", fill_value="extrapolate")(s)
 
-        ps_mesh = self.Ps[:, 0]
-        self.Ps = np.array([[s, func(s)] for s in ps_mesh])
+        ps_mesh = np.linspace(0.0, 1.0, len(self.Ps))
+        self.Ps = np.array([func(s) for s in ps_mesh])
 
-    def get_u(self):
-        _, u, _, _, _ = self.rupEc_from_q(self._q, self._area)
-        return u
+    def apply_inlet_boundary(self, q, area):
+        """Applique les conditions à l'entrée du tube."""
+        m = self.mach_from_q(q[1], area[1])
+        if m >= 1:
+            q[0] = self.q_from_fluid_port(self.fl_in, area[0], subsonic=False)
+        elif 0 <= m < 1:
+            q[0] = self.q_from_wpt(q[1, 1], self.fl_in.Pt, self.fl_in.Tt, area[0], subsonic=True)
+        elif m < 0:
+            q[0] = q[1]
+        else:
+            raise ValueError("Flux négatif à l'entrée")
 
-    def get_mach(self):
-        _, u, _, _, c = self.rupEc_from_q(self._q, self._area)
-        return u / c
+    def apply_outlet_boundary(self, q, area):
+        """Applique les conditions à la sortie du tube."""
+        gas = self.gas
+        m = self.mach_from_q(q[-2], area[-2])
+        if m >= 1:
+            q[-1] = q[-2]
+        elif 0 <= m < 1:
+            _, pt, tt = self.wpt_from_q(q[-2], area[-2])
+            ps = gas.static_p(pt, tt, m)
+            mach = gas.mach_ptpstt(pt, ps, tt)
+            ts = gas.static_t(tt, mach)
+            c, density = gas.c(ts), gas.density(ps, ts)
+            w = area[-2] * density * mach * c
+            q[-1] = self.q_from_wpt(w, pt, tt, area[-1], subsonic=True)
+        else:
+            raise ValueError("Vitesse négative à la sortie")
 
     def flux_LW(self, q, dt, dx, s):
         # flux at cell center

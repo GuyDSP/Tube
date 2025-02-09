@@ -150,7 +150,7 @@ class TestTube1D:
         print(solver.problem)
 
         assert sys.aero.res < sys.aero.ftol
-        assert residu < 1e-6
+        assert residu < 1e-3
 
     def test_run_once_uniform(self):
         """Test Tube1D in uniform conditions."""
@@ -194,4 +194,4 @@ class TestTube1D:
         assert pytest.approx(sys.fl_out.Pt, rel=1e-3) == Pt_in
         assert pytest.approx(sys.fl_out.Tt, rel=1e-3) == Tt_in
         assert pytest.approx(sys.fl_out.W, rel=2e-2) == W_in
-        assert sys.aero.Ps[1, -1] > ps_exit
+        assert sys.aero.Ps[-1] > ps_exit

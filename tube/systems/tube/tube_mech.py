@@ -5,22 +5,12 @@ from cosapp.systems import System
 
 
 class TubeMech(System):
-    """A geom tube model.
+    """A mechanical tube model.
 
     Inputs
     ------
-    d_in[m]: float
-        inlet diameter
-    d_exit[m]: float
-        exit diameter
-    length[m]: float
-        tube length
     Outputs
     -------
-    d_hot_in[m]: float
-        inlet diameter
-    d_hot_exit[m]: float
-        exit diameter
     """
 
     def setup(self):

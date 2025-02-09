@@ -3,10 +3,9 @@
 
 import numpy as np
 import pytest
+from cosapp.drivers import NonLinearSolver
 from pyturbo.thermo import IdealDryAir
 from scipy.optimize import fsolve
-
-from cosapp.drivers import NonLinearSolver
 
 from tube.systems.tube import Tube1D, Tube1DAero, Tube1DGeom, Tube1DMech
 
@@ -144,9 +143,11 @@ class TestTube1D:
 
     def test_run_driver(self):
         sys = Tube1D("tube")
-        solver = sys.add_driver(NonLinearSolver('solver'))
+        solver = sys.add_driver(NonLinearSolver("solver", max_iter=2))
         sys.run_drivers()
         residu = np.linalg.norm(solver.problem.residue_vector())
+
+        print(solver.problem)
 
         assert sys.aero.res < sys.aero.ftol
         assert residu < 1e-6
@@ -193,4 +194,4 @@ class TestTube1D:
         assert pytest.approx(sys.fl_out.Pt, rel=1e-3) == Pt_in
         assert pytest.approx(sys.fl_out.Tt, rel=1e-3) == Tt_in
         assert pytest.approx(sys.fl_out.W, rel=2e-2) == W_in
-        assert sys.aero.Ps(1) > ps_exit
+        assert sys.aero.Ps[1, -1] > ps_exit

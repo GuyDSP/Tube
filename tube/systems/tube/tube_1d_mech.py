@@ -3,6 +3,7 @@
 
 import numpy as np
 from cosapp.systems import System
+from scipy.interpolate import interp1d
 
 
 class Tube1DMech(System):
@@ -11,7 +12,7 @@ class Tube1DMech(System):
     Computes the geometry of a tube under internal pressure.
     """
 
-    def setup(self):
+    def setup(self, connection_size=4):
         # Geometry (Initial and Deformed)
         self.add_inward("geom_cold", lambda s: 0.1)  # Initial cross-sectional area (m²)
         self.add_outward("geom", lambda s: 0.1)  # Deformed cross-sectional area (m²)
@@ -21,7 +22,10 @@ class Tube1DMech(System):
         self.add_inward("thickness", 1.0e-3, unit="m")  # Thickness (converted to meters)
 
         # Aero (Pressure field)
-        self.add_inward("Ps", lambda s: 101325.0)  # Pressure (Pa)
+        s_values = np.linspace(0, 1, connection_size)
+        ps_values = np.full(connection_size, 101325.0)
+
+        self.add_inward("Ps", np.column_stack((s_values, ps_values)), unit="pa")
 
     def compute(self):
         """Compute the deformed geometry based on pressure."""
@@ -33,7 +37,7 @@ class Tube1DMech(System):
             R_cold = np.sqrt(A_cold / np.pi)  # Compute initial radius (m)
 
             # Pressure at position s
-            P = self.Ps(s)  # Pressure (Pa)
+            P = interp1d(self.Ps[:, 0], self.Ps[:, 1], kind="linear", fill_value="extrapolate")(s)
 
             # Tube material properties
             E = self.E  # Young's modulus (Pa)

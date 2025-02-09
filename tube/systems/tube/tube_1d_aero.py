@@ -11,13 +11,13 @@ from scipy.interpolate import interp1d
 class Tube1DAero(System):
     """ """
 
-    def __init__(self, name):
+    def __init__(self, name, **kwargs):
         self._area = None
         self._x = None
         self._q = None
-        super().__init__(name)
+        super().__init__(name, **kwargs)
 
-    def setup(self):
+    def setup(self, connection_size=4):
         self.add_inward("gas", IdealDryAir())
 
         # inputs/outputs
@@ -42,7 +42,10 @@ class Tube1DAero(System):
         self.add_inward("subsonic", True, desc="initial inlet flow status")
 
         # outwards
-        self.add_outward("Ps", lambda s: 101325.0, desc="static pressure")
+        s_values = np.linspace(0, 1, connection_size)
+        ps_values = np.full(connection_size, 101325.0)
+
+        self.add_outward("Ps", np.column_stack((s_values, ps_values)), unit="pa")
 
         # 1d solver
         self.add_inward("n", 11, desc="number of cells")
@@ -171,7 +174,12 @@ class Tube1DAero(System):
         self._q = q
 
         _, _, Ps, _, _ = self.rupEc_from_q(self._q, self._area)
-        self.Ps = lambda s: interp1d(self._x[1:-1], Ps, kind="linear", fill_value="extrapolate")(s)
+
+        def func(s):
+            return interp1d(self._x[1:-1], Ps, kind="linear", fill_value="extrapolate")(s)
+
+        ps_mesh = self.Ps[:, 0]
+        self.Ps = np.array([[s, func(s)] for s in ps_mesh])
 
     def get_u(self):
         _, u, _, _, _ = self.rupEc_from_q(self._q, self._area)

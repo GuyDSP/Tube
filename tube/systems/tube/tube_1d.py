@@ -20,11 +20,13 @@ class Tube1D(System):
         exit fluid
     """
 
-    def setup(self):
+    def setup(self, connection_size=4):
         # Physics
         self.add_child(Tube1DGeom("geom"), pulling=["d_in", "d_exit", "length"])
-        self.add_child(Tube1DMech("mech"))
-        self.add_child(Tube1DAero("aero"), pulling=["fl_in", "fl_out"])
+        self.add_child(Tube1DMech("mech", connection_size=connection_size))
+        self.add_child(
+            Tube1DAero("aero", connection_size=connection_size), pulling=["fl_in", "fl_out"]
+        )
 
         # connections
         self.connect(self.geom.outwards, self.mech.inwards, {"geom": "geom_cold"})

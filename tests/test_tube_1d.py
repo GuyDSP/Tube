@@ -6,7 +6,7 @@ import pytest
 from pyturbo.thermo import IdealDryAir
 from scipy.optimize import fsolve
 
-from tube.systems.tube import Tube1D, Tube1DAero, Tube1DGeom
+from tube.systems.tube import Tube1D, Tube1DAero, Tube1DGeom, Tube1DMech
 
 
 @pytest.fixture
@@ -117,6 +117,15 @@ class TestTube1DAero:
         sys.run_once()
         assert sys.res < sys.ftol
 
+class TestTube1DMech:
+    """Define tests for the Tube1DAero model."""
+
+    def test_setup(self):
+        Tube1DMech("tube")
+
+    def test_run_once(self):
+        sys = Tube1DMech("tube")
+        sys.run_once()
 
 class TestTube1D:
     """Define tests for the Tube1D model."""

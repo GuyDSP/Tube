@@ -3,6 +3,7 @@
 
 from tube.systems.tube.tube_1d_aero import Tube1DAero
 from tube.systems.tube.tube_1d_geom import Tube1DGeom
+from tube.systems.tube.tube_1d_mech import Tube1DMech
 from tube.systems.tube.tube_aero import TubeAero
 from tube.systems.tube.tube_geom import TubeGeom
 from tube.systems.tube.tube_mech import TubeMech
@@ -17,6 +18,7 @@ __all__ = [
     "TubeGeom",
     "Tube1DGeom",
     "TubeMech",
+    "Tube1DMech",
     "Tube",
     "Tube1D",
 ]

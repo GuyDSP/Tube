@@ -6,7 +6,7 @@ import pytest
 from pyturbo.thermo import IdealDryAir
 from scipy.optimize import fsolve
 
-from tube.systems.tube import Tube1DAero, Tube1D
+from tube.systems.tube import Tube1D, Tube1DAero
 
 
 class TestBasic:
@@ -118,7 +118,7 @@ class TestTube1D:
 
     def test_run_once_uniform(self):
         sys = Tube1D("tube")
-        area_in = np.pi * (sys.d_in/2) ** 2
+        area_in = np.pi * (sys.d_in / 2) ** 2
 
         # numerical solution
         sys.fl_in.W = 1.0

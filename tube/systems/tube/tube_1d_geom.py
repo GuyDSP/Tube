@@ -35,8 +35,8 @@ class Tube1DGeom(System):
 
     def compute(self):
         self.geom = np.array(
-                [
-                    [0.0, np.pi * (self.d_in/2) ** 2],
-                    [self.length, np.pi * (self.d_exit/2) ** 2],
-                ]
-            )
+            [
+                [0.0, np.pi * (self.d_in / 2) ** 2],
+                [self.length, np.pi * (self.d_exit / 2) ** 2],
+            ]
+        )

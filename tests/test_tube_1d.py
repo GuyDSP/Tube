@@ -160,8 +160,9 @@ class TestTube1D:
         sys.d_exit = np.sqrt(area_exit / np.pi) * 2
 
         # Numerical solution
-        sys.fl_in.W = 1.0
-        sys.fl_in.Pt, sys.fl_in.Tt = 100000.0, 300.0
+        gas = IdealDryAir()
+        mach = gas.mach(sys.fl_in.Pt, sys.fl_in.Tt, sys.fl_in.W/area_exit, subsonic=True)
+        sys.aero.ps_exit = gas.static_p(sys.fl_in.Pt, sys.fl_in.Tt, mach)
 
         sys.run_once()
 

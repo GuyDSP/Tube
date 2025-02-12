@@ -39,7 +39,8 @@ class Tube1DAero(System):
         self.add_inward("subsonic", True, desc="initial inlet flow status")
 
         # outwards
-        self.add_outward("Ps", np.full(connection_size, 101325.0), unit="pa")
+        self.add_outward("Ps", np.full(connection_size, 100000.0), unit="pa")
+        self.add_outward("ps_exit", 100000.0, unit="pa")
 
         # 1d solver
         self.add_inward("n", 11, desc="number of cells")
@@ -52,6 +53,10 @@ class Tube1DAero(System):
 
         self.add_outward("res", 0.0)
         self.add_outward("it", 0)
+
+        # solver
+        self.add_equation("fl_in.W == fl_out.W")
+        self.add_unknown("fl_in.W")
 
     def compute(self):
         # For 1D modelisation : https://perso.univ-lyon1.fr/marc.buffat/COURS/AERO_HTML/node45.html
@@ -126,9 +131,6 @@ class Tube1DAero(System):
             it += 1
 
         # primary variable
-
-        self.fl_out.W, self.fl_out.Pt, self.fl_out.Tt = self.wpt_from_q(q[-2], area[-2])
-
         self.res = res
         self.it = it
         self._q = q
@@ -141,6 +143,10 @@ class Tube1DAero(System):
         ps_mesh = np.linspace(0.0, 1.0, len(self.Ps))
         self.Ps = np.array([func(s) for s in ps_mesh])
 
+        # exit flow
+        self.fl_out.W, self.fl_out.Pt, self.fl_out.Tt = self.wpt_from_q(q[-1], area[-1])
+        self.ps_exit = self.Ps[-1]
+
     def apply_inlet_boundary(self, q, area):
         """Applique les conditions à l'entrée du tube."""
         m = self.mach_from_q(q[1], area[1])
@@ -148,10 +154,8 @@ class Tube1DAero(System):
             q[0] = self.q_from_fluid_port(self.fl_in, area[0], subsonic=False)
         elif 0 <= m < 1:
             q[0] = self.q_from_wpt(q[1, 1], self.fl_in.Pt, self.fl_in.Tt, area[0], subsonic=True)
-        elif m < 0:
-            q[0] = q[1]
         else:
-            raise ValueError("Flux négatif à l'entrée")
+            q[0] = q[1]
 
     def apply_outlet_boundary(self, q, area):
         """Applique les conditions à la sortie du tube."""
@@ -161,10 +165,9 @@ class Tube1DAero(System):
             q[-1] = q[-2]
         elif 0 <= m < 1:
             _, pt, tt = self.wpt_from_q(q[-2], area[-2])
-            ps = gas.static_p(pt, tt, m)
-            mach = gas.mach_ptpstt(pt, ps, tt)
+            mach = gas.mach_ptpstt(pt, self.ps_exit, tt)
             ts = gas.static_t(tt, mach)
-            c, density = gas.c(ts), gas.density(ps, ts)
+            c, density = gas.c(ts), gas.density(self.ps_exit, ts)
             w = area[-2] * density * mach * c
             q[-1] = self.q_from_wpt(w, pt, tt, area[-1], subsonic=True)
         else:

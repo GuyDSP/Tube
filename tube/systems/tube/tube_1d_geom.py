@@ -27,11 +27,11 @@ class Tube1DGeom(System):
     def compute(self):
         points = np.array(
             [
-                [0.0, np.pi * (self.d_in / 2) ** 2],
-                [self.length, np.pi * (self.d_exit / 2) ** 2],
+                np.pi * (self.d_in / 2) ** 2,
+                np.pi * (self.d_exit / 2) ** 2,
             ]
         )
 
         self.section = lambda s: interp1d(
-            points[:, 0], points[:, 1], kind="linear", fill_value="extrapolate"
+            [0.0, 1.0], points, kind="linear", fill_value="extrapolate"
         )(s)

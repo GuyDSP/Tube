@@ -42,10 +42,10 @@ class Tube1DMech(System):
             t = self.thickness  # Thickness (m)
 
             # Compute radial deformation
-            delta_R = (P * R_cold) / (E * t)
+            eps_R = (P * R_cold) / (E * t)
 
             # Compute new radius and new area
-            R_new = R_cold + delta_R  # New deformed radius
+            R_new = R_cold * (1 + eps_R)  # New deformed radius
             A_new = np.pi * R_new**2  # New cross-sectional area
 
             return A_new  # Return updated area
